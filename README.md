@@ -3,15 +3,15 @@
 One way to build, test and release every krazow app: the web app (PWA), an Android APK, a Windows installer, and
 iOS/macOS where an app has its own build for them. Each app repo calls this kit, so a fix here reaches every app.
 
-In any app repo, type **`/releasenow`** in a Claude chat:
+In any app repo, type **`/release now`** in a Claude chat:
 
 | You type | What happens |
 |---|---|
-| `/releasenow` | Bumps the version, writes the changelog, pushes the `release/beta` branch. GitHub tags `vX.Y.Z-beta.N`, runs QA, builds every platform, publishes the beta and smoke-tests it live. |
-| `/releasenow promote` | Puts that beta into production: the main web address and the Latest release (with the APK and installer). |
-| `/releasenow all` | Beta, live smoke test, then production in one go (hotfixes). |
-| `/releasenow status` | What's on beta and production, and the last runs. |
-| `/releasenow rollback` | Puts the previous production version back at the main web address. |
+| `/release now` | Bumps the version, writes the changelog, pushes the `release/beta` branch. GitHub tags `vX.Y.Z-beta.N`, runs QA, builds every platform, publishes the beta and smoke-tests it live. |
+| `/release promote` | Puts that beta into production: the main web address and the Latest release (with the APK and installer). |
+| `/release all` | Beta, live smoke test, then production in one go (hotfixes). |
+| `/release status` | What's on beta and production, and the last runs. |
+| `/release rollback` | Puts the previous production version back at the main web address. |
 
 ## How a release works
 

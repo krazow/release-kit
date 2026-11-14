@@ -90,14 +90,14 @@ def cmd_info(_args):
         if not re.fullmatch(r"\d+\.\d+\.\d+", v):
             die("VERSION must hold a version like 1.2.3.")
         if f"v{v}" in all_tags:
-            die(f"v{v} is already released. Bump VERSION (run /releasenow again) for a new beta.")
+            die(f"v{v} is already released. Bump VERSION (run /release now again) for a new beta.")
         nums = [int(TAG_BETA.match(x).group(2)) for x in all_tags if TAG_BETA.match(x) and TAG_BETA.match(x).group(1) == v]
         ref = create_tag = f"v{v}-beta.{max(nums, default=0) + 1}"
     elif ref == "release/production":
         head = git("rev-parse", "HEAD")
         here = [x for x in all_tags if TAG_BETA.match(x) and git("rev-list", "-n1", x) == head]
         if not here:
-            die("release/production must point at a commit that went through beta. Run /releasenow first, then /releasenow promote.")
+            die("release/production must point at a commit that went through beta. Run /release now first, then /release promote.")
         here.sort(key=lambda x: [int(n) for n in TAG_BETA.match(x).group(1).split(".")] + [int(TAG_BETA.match(x).group(2))])
         v = TAG_BETA.match(here[-1]).group(1)
         if f"v{v}" in all_tags:
@@ -125,13 +125,13 @@ def cmd_info(_args):
         sha = git("rev-list", "-n1", ref)
         betas_here = [t for t in beta_tags if git("rev-list", "-n1", t) == sha and t.startswith(f"v{version}-beta.")]
         if not betas_here:
-            die(f"{ref} isn't on a commit that went through beta. Run /releasenow first, then /releasenow promote.")
+            die(f"{ref} isn't on a commit that went through beta. Run /release now first, then /release promote.")
         root_tag, beta_tag = ref, beta_tags[-1]
     else:
         die(f"'{ref}' isn't a release tag. Beta tags look like v1.2.3-beta.1 and production tags like v1.2.3.")
     file_version = Path("VERSION").read_text().strip() if Path("VERSION").exists() else ""
     if mode in ("beta", "promote") and file_version != version:
-        die(f"The VERSION file says {file_version or 'nothing'} but the tag is for {version}. /releasenow keeps these in step.")
+        die(f"The VERSION file says {file_version or 'nothing'} but the tag is for {version}. /release now keeps these in step.")
     app_sub = os.path.relpath(cfg["app"], cfg["site"])
     gh_out(mode=mode, version=version, app_sub=app_sub, create_tag=create_tag, type=cfg["type"], root_tag=root_tag, beta_tag=beta_tag,
            beta_full=(TAG_BETA.match(beta_tag).group(0)[1:] if beta_tag else ""),

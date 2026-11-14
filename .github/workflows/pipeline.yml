@@ -238,7 +238,7 @@ jobs:
         uses: actions/deploy-pages@v4
       - name: Explain a Pages failure
         if: failure()
-        run: echo "::error::GitHub Pages wouldn't publish. In the repo, open Settings → Pages and set Source to \"GitHub Actions\" (one-time setting), then run /releasenow again."
+        run: echo "::error::GitHub Pages wouldn't publish. In the repo, open Settings → Pages and set Source to \"GitHub Actions\" (one-time setting), then run /release now again."
 
   release:
     name: GitHub release

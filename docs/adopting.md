@@ -5,10 +5,10 @@ What an app repo needs. `templates/` has a copy of every file.
 | File | What it's for |
 |---|---|
 | `release.json` | Describes the app (below). |
-| `VERSION` | The version, like `1.4.0`. `/releasenow` bumps it; nothing else should. |
+| `VERSION` | The version, like `1.4.0`. `/release now` bumps it; nothing else should. |
 | `.github/workflows/release.yml` | Calls the kit's pipeline when a release tag is pushed. |
 | `.github/workflows/ci.yml` | Runs the kit's QA on pull requests and pushes to `main`. |
-| `.claude/commands/releasenow.md` | The `/releasenow` command. Copy it unchanged. |
+| `.claude/commands/release.md` (+ `releasenow.md`) | The `/release` command (`/release now`, `promote`, …) and its old name. Copy both unchanged. It only ever releases the repo the chat is on. |
 | `package.json` + `tests/` | Playwright tests run by `npm test`. Start from `templates/tests/smoke.test.mjs` and add the app's main actions. |
 | `CHANGELOG.md` | Release notes, one `## X.Y.Z (date)` section per version. |
 

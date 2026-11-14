@@ -1,5 +1,5 @@
 # Releases this app with the shared Krazow release kit (github.com/krazow/release-kit).
-# Don't run this by hand: type /releasenow in a Claude chat on this repo. It pushes one of these branches:
+# Don't run this by hand: type /release now in a Claude chat on this repo. It pushes one of these branches:
 #   release/beta -> the next beta      release/production -> promote that beta      release/rollback/v1.2.3 -> put v1.2.3 back
 # (Pushing tags v1.2.3-beta.1 / v1.2.3 works too.) The pipeline makes the release tags itself.
 name: Release

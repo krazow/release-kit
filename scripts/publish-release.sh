@@ -24,7 +24,7 @@ if [ "$MODE" = beta ]; then
   gh release create "$BETA_TAG" --repo "$REPO" --prerelease --verify-tag \
     --title "$NAME $VERSION beta (${BETA_TAG##*-})" --notes-file /tmp/beta.md "${beta_files[@]}"
 
-  # The production release waits as a draft until /releasenow promote. Replace any older draft for this version.
+  # The production release waits as a draft until /release promote. Replace any older draft for this version.
   if gh release view "$TAG" --repo "$REPO" --json isDraft -q .isDraft 2>/dev/null | grep -q true; then
     gh release delete "$TAG" --repo "$REPO" --yes
   fi
@@ -37,7 +37,7 @@ if [ "$MODE" = beta ]; then
   } > /tmp/prod.md
   gh release create "$TAG" --repo "$REPO" --draft --target "$GITHUB_SHA" \
     --title "$NAME $VERSION" --notes-file /tmp/prod.md "${prod_files[@]}"
-  echo "Beta published. Production $TAG is waiting as a draft for /releasenow promote." >> "$GITHUB_STEP_SUMMARY"
+  echo "Beta published. Production $TAG is waiting as a draft for /release promote." >> "$GITHUB_STEP_SUMMARY"
 
 elif [ "$MODE" = promote ]; then
   if gh release view "$TAG" --repo "$REPO" --json isDraft -q .isDraft 2>/dev/null | grep -q true; then
