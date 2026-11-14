@@ -167,15 +167,15 @@ def cmd_check(_args):
         f = Path(v["file"])
         if not f.exists() or not re.search(v["pattern"], f.read_text()):
             problems.append(f"Version pattern {v['pattern']!r} not found in {v['file']}.")
-    man = Path(cfg["app"]) / "manifest.webmanifest"
-    if man.exists():
+    man = next((Path(cfg["app"]) / n for n in ("manifest.webmanifest", "manifest.json") if (Path(cfg["app"]) / n).exists()), None)
+    if man:
         try:
             mj = json.loads(man.read_text())
             for k in ("start_url", "scope"):
                 if str(mj.get(k, ".")).startswith(("/", "http")):
-                    problems.append(f"manifest.webmanifest {k} must be relative (like \".\") so the app also works under /beta/.")
+                    problems.append(f"{man.name} {k} must be relative (like \".\") so the app also works under /beta/.")
         except ValueError:
-            problems.append("manifest.webmanifest isn't valid JSON.")
+            problems.append(f"{man.name} isn't valid JSON.")
     if cfg["windows"]["enabled"] and cfg["windows"].get("build", "kit") == "kit" and not cfg["windows"].get("port"):
         problems.append('windows.port is required (a fixed number between 40000 and 49000, different for each app).')
     if cfg["android"]["enabled"] and cfg["android"].get("build", "kit") == "kit" and not cfg["android"].get("appId"):
@@ -258,7 +258,7 @@ def cmd_build_web(args):
             h = html.read_text()
             h2 = re.sub(r"(<head[^>]*>)", lambda m: m.group(1) + BETA_HEAD, h, count=1, flags=re.I)
             html.write_text(h2 if h2 != h else BETA_HEAD + h)
-        for man in out.rglob("*.webmanifest"):
+        for man in [*out.rglob("*.webmanifest"), *out.rglob("manifest.json")]:
             try:
                 mj = json.loads(man.read_text())
             except ValueError:
@@ -300,7 +300,7 @@ def cmd_notes(args):
 
 # ---------------------------------------------------------------- icons
 def best_icon(app_dir):
-    man = Path(app_dir) / "manifest.webmanifest"
+    man = next((Path(app_dir) / n for n in ("manifest.webmanifest", "manifest.json") if (Path(app_dir) / n).exists()), Path(app_dir) / "none")
     best, size = None, 0
     if man.exists():
         try:
