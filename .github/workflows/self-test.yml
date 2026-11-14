@@ -1,0 +1,67 @@
+# Builds the sample app in examples/sample with every part of the kit, so a broken kit is caught here
+# before any app uses it.
+name: Kit self-test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: examples/sample } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: python3 ../../scripts/kit.py check
+      - run: |
+          python3 ../../scripts/kit.py build-web --channel prod --out /tmp/www/prod
+          python3 ../../scripts/kit.py build-web --channel beta --out /tmp/www/beta --label 1.0.0-beta.1
+      - run: npm install --no-save playwright@1 && npx playwright install --with-deps chromium
+      - name: Sample app tests (prod and beta builds)
+        run: |
+          node ../../scripts/site-check.mjs /tmp/www/prod /tmp/www/prod
+          node ../../scripts/site-check.mjs /tmp/www/beta /tmp/www/beta
+          node tests/storage.test.mjs
+      - uses: actions/upload-artifact@v4
+        with: { name: www, path: /tmp/www }
+
+  android:
+    needs: web
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: examples/sample } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: www, path: /tmp/www }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.10.2' }
+      - run: pip install pillow
+      - run: bash ../../android/build.sh
+        env: { VERSION: 1.0.0, BETA_FULL: 1.0.0-beta.1 }
+      - name: Check the APKs
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/aapt2" dump badging dist/prod/*.apk | grep -E "^package|application-label:"
+          "$BT/aapt2" dump badging dist/beta/*.apk | grep -E "^package|application-label:"
+          "$BT/aapt2" dump badging dist/beta/*.apk | grep -q "name='com.krazow.kitsample.beta'"
+          unzip -l dist/prod/*.apk | grep -q "assets/www/index.html"
+
+  windows:
+    needs: web
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: examples/sample } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: www, path: /tmp/www }
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24' }
+      - run: pip install pillow
+      - run: bash ../../windows/build.sh
+        env: { VERSION: 1.0.0, BETA_FULL: 1.0.0-beta.1 }
+      - run: ls -la dist/prod/*.exe dist/beta/*.exe

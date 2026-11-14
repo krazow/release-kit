@@ -1,0 +1,278 @@
+# Krazow release kit: the one release pipeline every app uses.
+# An app calls it from .github/workflows/release.yml (see templates/release.yml). Tags decide what happens:
+#   v1.2.3-beta.1  -> QA, build every platform, publish the beta (web /beta/, pre-release), smoke-test it live
+#   v1.2.3         -> promote: the same version goes to the main web address and its release becomes Latest
+#   rollback_to    -> (run by hand) put an earlier production version back at the main web address
+name: Release pipeline
+
+on:
+  workflow_call:
+    inputs:
+      rollback_to:
+        type: string
+        default: ''
+      kit_ref:
+        type: string
+        default: v1
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  prepare:
+    name: Work out what to release
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.info.outputs.mode }}
+      version: ${{ steps.info.outputs.version }}
+      root_tag: ${{ steps.info.outputs.root_tag }}
+      beta_tag: ${{ steps.info.outputs.beta_tag }}
+      beta_full: ${{ steps.info.outputs.beta_full }}
+      name: ${{ steps.info.outputs.name }}
+      app_sub: ${{ steps.info.outputs.app_sub }}
+      android: ${{ steps.info.outputs.android }}
+      windows: ${{ steps.info.outputs.windows }}
+      ios: ${{ steps.info.outputs.ios }}
+      macos: ${{ steps.info.outputs.macos }}
+      extras: ${{ steps.info.outputs.extras }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/checkout@v4
+        with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
+      - id: info
+        env: { ROLLBACK_TO: '${{ inputs.rollback_to }}' }
+        run: python3 .kit/scripts/kit.py info
+      - name: Summary
+        run: |
+          {
+            echo "### ${{ steps.info.outputs.name }}: ${{ steps.info.outputs.mode }} ${{ steps.info.outputs.version }}"
+            echo "Platforms: web, android=${{ steps.info.outputs.android }}, windows=${{ steps.info.outputs.windows }}, ios=${{ steps.info.outputs.ios }}, macos=${{ steps.info.outputs.macos }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  qa:
+    name: QA
+    needs: prepare
+    if: needs.prepare.outputs.mode == 'beta'
+    uses: krazow/release-kit/.github/workflows/qa.yml@v1
+    with:
+      kit_ref: ${{ inputs.kit_ref }}
+
+  web:
+    name: Build the web app
+    needs: [prepare, qa]
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/checkout@v4
+        with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Assemble the site (production at the root, beta under /beta/)
+        env:
+          MODE: ${{ needs.prepare.outputs.mode }}
+          ROOT_TAG: ${{ needs.prepare.outputs.root_tag }}
+          BETA_TAG: ${{ needs.prepare.outputs.beta_tag }}
+          BETA_FULL: ${{ needs.prepare.outputs.beta_full }}
+        run: |
+          set -e
+          K=.kit/scripts/kit.py
+          build() { # build <channel> <git-ref or "here"> <out> [label]
+            if [ "$2" = here ]; then S=.; else rm -rf "/tmp/wt-$1"; git worktree add -f "/tmp/wt-$1" "$2" >/dev/null; S="/tmp/wt-$1"; fi
+            python3 $K build-web --channel "$1" --src "$S" --out "$3" ${4:+--label "$4"}
+          }
+          case "$MODE" in
+            beta)
+              if [ -n "$ROOT_TAG" ]; then build prod "$ROOT_TAG" site; else
+                echo "::notice::No production release yet, so this first release also goes to the main address."; build prod here site; fi
+              build beta here site/beta "$BETA_FULL"
+              build prod here www-prod; build beta here www-beta "$BETA_FULL" ;;
+            promote)
+              build prod here site
+              build beta "$BETA_TAG" site/beta "$BETA_FULL" ;;
+            rollback)
+              build prod "$ROOT_TAG" site
+              if [ -n "$BETA_TAG" ]; then build beta "$BETA_TAG" site/beta "$BETA_FULL"; fi ;;
+          esac
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - name: Keep the app files for the native builds
+        if: needs.prepare.outputs.mode == 'beta'
+        env: { APP_SUB: '${{ needs.prepare.outputs.app_sub }}' }
+        run: mkdir -p www && cp -r "www-prod/$APP_SUB" www/prod && cp -r "www-beta/$APP_SUB" www/beta
+      - uses: actions/upload-artifact@v4
+        if: needs.prepare.outputs.mode == 'beta'
+        with: { name: www, path: www, retention-days: 7 }
+
+  android:
+    name: Android APK
+    needs: [prepare, web]
+    if: ${{ !failure() && !cancelled() && needs.prepare.outputs.mode == 'beta' && needs.prepare.outputs.android == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
+      - uses: actions/download-artifact@v4
+        with: { name: www, path: /tmp/www }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.10.2' }
+      - run: pip install pillow
+      - name: Build, align and sign (beta and production)
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BETA_FULL: ${{ needs.prepare.outputs.beta_full }}
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: bash .kit/android/build.sh
+      - uses: actions/upload-artifact@v4
+        with: { name: dist-android, path: dist }
+
+  windows:
+    name: Windows installer
+    needs: [prepare, web]
+    if: ${{ !failure() && !cancelled() && needs.prepare.outputs.mode == 'beta' && needs.prepare.outputs.windows == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
+      - uses: actions/download-artifact@v4
+        with: { name: www, path: /tmp/www }
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install pillow
+      - name: Build the installers (beta and production)
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BETA_FULL: ${{ needs.prepare.outputs.beta_full }}
+        run: bash .kit/windows/build.sh
+      - uses: actions/upload-artifact@v4
+        with: { name: dist-windows, path: dist }
+
+  ios:
+    name: iOS (unsigned .ipa)
+    needs: [prepare, web]
+    if: ${{ !failure() && !cancelled() && needs.prepare.outputs.mode == 'beta' && needs.prepare.outputs.ios == 'true' }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
+      - uses: actions/download-artifact@v4
+        with: { name: www, path: /tmp/www }
+      - name: Build (the app's own script)
+        env: { VERSION: '${{ needs.prepare.outputs.version }}', BETA_FULL: '${{ needs.prepare.outputs.beta_full }}' }
+        run: bash .kit/scripts/custom.sh ios
+      - uses: actions/upload-artifact@v4
+        with: { name: dist-ios, path: dist }
+
+  macos:
+    name: macOS
+    needs: [prepare, web]
+    if: ${{ !failure() && !cancelled() && needs.prepare.outputs.mode == 'beta' && needs.prepare.outputs.macos == 'true' }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
+      - uses: actions/download-artifact@v4
+        with: { name: www, path: /tmp/www }
+      - name: Build (the app's own script)
+        env: { VERSION: '${{ needs.prepare.outputs.version }}', BETA_FULL: '${{ needs.prepare.outputs.beta_full }}' }
+        run: bash .kit/scripts/custom.sh macos
+      - uses: actions/upload-artifact@v4
+        with: { name: dist-macos, path: dist }
+
+  extras:
+    name: Extra downloads
+    needs: [prepare, web]
+    if: ${{ !failure() && !cancelled() && needs.prepare.outputs.mode == 'beta' && needs.prepare.outputs.extras == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
+      - uses: actions/download-artifact@v4
+        with: { name: www, path: /tmp/www }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24' }
+      - name: Build (the app's own script)
+        env: { VERSION: '${{ needs.prepare.outputs.version }}', BETA_FULL: '${{ needs.prepare.outputs.beta_full }}' }
+        run: bash .kit/scripts/custom.sh extras
+      - uses: actions/upload-artifact@v4
+        with: { name: dist-extras, path: dist }
+
+  deploy:
+    name: Publish the web app
+    needs: [prepare, web, android, windows, ios, macos, extras]
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    outputs:
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - id: pages
+        uses: actions/deploy-pages@v4
+      - name: Explain a Pages failure
+        if: failure()
+        run: echo "::error::GitHub Pages wouldn't publish. In the repo, open Settings → Pages and set Source to \"GitHub Actions\" (one-time setting), then run /releasenow again."
+
+  release:
+    name: GitHub release
+    needs: [prepare, deploy]
+    if: ${{ !failure() && !cancelled() && needs.prepare.outputs.mode != 'rollback' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/checkout@v4
+        with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'dist-*', path: dist, merge-multiple: true }
+        continue-on-error: true
+      - name: Publish
+        env:
+          MODE: ${{ needs.prepare.outputs.mode }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          NAME: ${{ needs.prepare.outputs.name }}
+          BETA_TAG: ${{ needs.prepare.outputs.beta_tag }}
+          URL: ${{ needs.deploy.outputs.url }}
+        run: bash .kit/scripts/publish-release.sh
+
+  live-check:
+    name: Smoke-test the live site
+    needs: [prepare, deploy, release]
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-save playwright@1 && npx playwright install --with-deps chromium
+      - name: Open the live app
+        env:
+          MODE: ${{ needs.prepare.outputs.mode }}
+          URL: ${{ needs.deploy.outputs.url }}
+        run: |
+          APP="${{ needs.prepare.outputs.app_sub }}"
+          [ "$APP" = . ] && APP="" || APP="$APP/"
+          if [ "$MODE" = beta ]; then T="${URL%/}/beta/$APP"; else T="${URL%/}/$APP"; fi
+          node .kit/scripts/site-check.mjs "$T"
+          echo "Checked $T" >> "$GITHUB_STEP_SUMMARY"

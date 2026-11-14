@@ -1,0 +1,26 @@
+# Releases this app with the shared Krazow release kit (github.com/krazow/release-kit).
+# Don't run this by hand: type /releasenow in a Claude chat on this repo. It pushes the tags that start it:
+#   v1.2.3-beta.1 -> beta      v1.2.3 -> production
+# To put an older production version back: Actions → Release → Run workflow → "rollback_to" (or /releasenow rollback).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      rollback_to:
+        description: 'Production version to put back, like v1.2.3'
+        required: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  release:
+    uses: krazow/release-kit/.github/workflows/pipeline.yml@v1
+    with:
+      rollback_to: ${{ inputs.rollback_to || '' }}
+    secrets: inherit

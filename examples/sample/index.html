@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kit Sample</title>
+<link rel="manifest" href="manifest.webmanifest">
+</head>
+<body>
+<h1>Kit Sample</h1>
+<p>Version <span id="v"></span>. Tapped <span id="n">0</span> times.</p>
+<button id="tap">Tap</button>
+<script>
+const APP_VERSION = '1.0.0';
+document.getElementById('v').textContent = APP_VERSION;
+const n = document.getElementById('n');
+n.textContent = localStorage.getItem('sample-taps') || '0';
+document.getElementById('tap').onclick = () => { const v = +n.textContent + 1; n.textContent = v; localStorage.setItem('sample-taps', v); };
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>

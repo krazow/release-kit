@@ -1,0 +1,14 @@
+{
+  "id": "sample",
+  "name": "Kit Sample",
+  "description": "The release kit's own test app.",
+  "site": ".",
+  "app": ".",
+  "sw": "sw.js",
+  "version": [{ "file": "index.html", "pattern": "const APP_VERSION = '([^']*)'" }],
+  "android": { "enabled": true, "appId": "com.krazow.kitsample" },
+  "windows": { "enabled": true, "port": 47990 },
+  "ios": { "enabled": false },
+  "macos": { "enabled": false },
+  "extras": { "enabled": false }
+}

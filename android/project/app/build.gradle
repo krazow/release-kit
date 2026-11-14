@@ -1,0 +1,30 @@
+// Krazow release kit: the shared Android wrapper. Everything app-specific comes in as -P properties from build.sh.
+plugins { id 'com.android.application' }
+
+def prop = { String k, String d -> project.hasProperty(k) ? project.property(k).toString() : d }
+
+android {
+    namespace 'com.krazow.webapp'
+    compileSdk 35
+    defaultConfig {
+        applicationId prop('appId', 'com.krazow.webapp')
+        minSdk 24
+        targetSdk 35
+        versionCode prop('versionCode', '1') as int
+        versionName prop('versionName', '0.0.0')
+        resValue 'string', 'app_name', prop('appName', 'App')
+        manifestPlaceholders = [appName: prop('appName', 'App')]
+    }
+    buildTypes {
+        release { minifyEnabled false }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    androidResources { noCompress += ['webmanifest'] }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
