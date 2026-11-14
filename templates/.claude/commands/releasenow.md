@@ -63,6 +63,8 @@ merged: say so with the pull request's link and skip that project. Never merge i
 4. Commit as "Release X.Y.Z", push `main`, then start the beta: `git push --force origin HEAD:refs/heads/release/beta`.
 5. Follow the run (see "Following the run"). On success, tell me in plain language: the beta web address
    (`https://<owner>.github.io/<repo>/beta/`), the pre-release page with the APK and installer, and what's in it.
+   A **server** app (`"type": "server"` in `release.json`) has no web address: give the pre-release page and how to
+   install the beta (the "Updating" or "Releasing" part of its README, for example `sudo ./update.sh beta` on the Pi).
    End with: "When you've tried it, run /releasenow promote."
 
 **`promote`: put the newest beta into production.**

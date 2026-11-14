@@ -36,6 +36,9 @@ def load_cfg(src="."):
             die(f"release.json needs \"{k}\".")
     if not re.fullmatch(r"[a-z][a-z0-9]*", cfg["id"]):
         die('release.json "id" must be lowercase letters and digits only (it becomes the cache and storage prefix).')
+    cfg.setdefault("type", "web")              # "web" (a PWA on GitHub Pages) or "server" (downloads only)
+    if cfg["type"] not in ("web", "server"):
+        die('release.json "type" must be "web" or "server".')
     cfg.setdefault("site", ".")
     cfg.setdefault("app", cfg["site"])
     cfg.setdefault("exclude", [])
@@ -130,7 +133,7 @@ def cmd_info(_args):
     if mode in ("beta", "promote") and file_version != version:
         die(f"The VERSION file says {file_version or 'nothing'} but the tag is for {version}. /releasenow keeps these in step.")
     app_sub = os.path.relpath(cfg["app"], cfg["site"])
-    gh_out(mode=mode, version=version, app_sub=app_sub, create_tag=create_tag, root_tag=root_tag, beta_tag=beta_tag,
+    gh_out(mode=mode, version=version, app_sub=app_sub, create_tag=create_tag, type=cfg["type"], root_tag=root_tag, beta_tag=beta_tag,
            beta_full=(TAG_BETA.match(beta_tag).group(0)[1:] if beta_tag else ""),
            id=cfg["id"], name=cfg["name"],
            android=str(cfg["android"]["enabled"]).lower(), windows=str(cfg["windows"]["enabled"]).lower(),
@@ -149,7 +152,9 @@ def cmd_check(_args):
     if not Path("VERSION").exists() or not re.fullmatch(r"\d+\.\d+\.\d+", Path("VERSION").read_text().strip()):
         problems.append("VERSION must exist and hold a version like 1.2.3.")
     sw = Path(cfg["app"]) / cfg["sw"]
-    if not sw.exists():
+    if cfg["type"] == "server":
+        pass  # no service worker or manifest; the downloads are built by "extras"
+    elif not sw.exists():
         problems.append(f"Service worker {sw} is missing (set \"sw\" in release.json).")
     else:
         t = sw.read_text()
@@ -168,7 +173,7 @@ def cmd_check(_args):
         if not f.exists() or not re.search(v["pattern"], f.read_text()):
             problems.append(f"Version pattern {v['pattern']!r} not found in {v['file']}.")
     man = next((Path(cfg["app"]) / n for n in ("manifest.webmanifest", "manifest.json") if (Path(cfg["app"]) / n).exists()), None)
-    if man:
+    if man and cfg["type"] == "web":
         try:
             mj = json.loads(man.read_text())
             for k in ("start_url", "scope"):
@@ -180,6 +185,8 @@ def cmd_check(_args):
         problems.append('windows.port is required (a fixed number between 40000 and 49000, different for each app).')
     if cfg["android"]["enabled"] and cfg["android"].get("build", "kit") == "kit" and not cfg["android"].get("appId"):
         problems.append("android.appId is required (like com.krazow.myapp).")
+    if cfg["type"] == "server" and not cfg["extras"]["enabled"]:
+        problems.append('A "server" app ships its downloads through "extras": set extras.enabled and extras.custom.')
     if problems:
         for p in problems:
             print(f"::error::{p}")

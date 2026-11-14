@@ -28,19 +28,41 @@ jobs:
       - name: Release checks (version, service worker, manifest)
         run: python3 .kit/scripts/kit.py check
 
+      - name: What kind of app
+        id: t
+        run: echo "type=$(python3 -c "import json;print(json.load(open('release.json')).get('type','web'))")" >> "$GITHUB_OUTPUT"
+
+      - name: Server app tests (release.json "setup" and "test" commands)
+        if: steps.t.outputs.type == 'server'
+        run: |
+          for f in $(git ls-files '*.sh'); do bash -n "$f" && echo "ok   $f parses"; done
+          python3 - <<'PY'
+          import json, subprocess, sys
+          c = json.load(open('release.json'))
+          for cmd in c.get('setup', []) + c.get('test', []):
+              print('$ ' + cmd, flush=True)
+              if subprocess.run(cmd, shell=True).returncode:
+                  sys.exit(1)
+          if not c.get('test'):
+              print('::error::This server app has no tests: list them in release.json "test".'); sys.exit(1)
+          PY
+
       - name: Build the site (beta and production) to make sure both work
+        if: steps.t.outputs.type != 'server'
         id: build
         run: |
           python3 .kit/scripts/kit.py build-web --channel beta --out /tmp/site-beta
           python3 .kit/scripts/kit.py build-web --channel prod --out /tmp/site-prod
 
       - name: Install test tools
+        if: steps.t.outputs.type != 'server'
         run: |
           if [ -f package.json ]; then npm install --no-audit --no-fund; fi
           node -e "require.resolve('playwright')" 2>/dev/null || npm install --no-save --no-audit --no-fund playwright@1
           npx playwright install --with-deps chromium
 
       - name: App tests
+        if: steps.t.outputs.type != 'server'
         run: |
           if [ -f package.json ] && node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)"; then
             npm test
@@ -50,4 +72,5 @@ jobs:
           fi
 
       - name: Kit smoke test (opens the built site in a browser)
+        if: steps.t.outputs.type != 'server'
         run: node .kit/scripts/site-check.mjs /tmp/site-prod "${{ steps.build.outputs.app_dir }}"

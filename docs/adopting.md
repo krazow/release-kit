@@ -54,6 +54,22 @@ Remove any workflow that deploys Pages or makes releases on push to `main`: rele
   for that channel) and `OUT` (put the downloads there). Name beta downloads with "Beta". Add `"betaBuild": false` to
   build production only. iOS and macOS custom builds run on GitHub's macOS runners.
 
+## Server apps
+
+An app that runs as a service (a Python server on a Raspberry Pi, for example) uses `"type": "server"`. There's no
+GitHub Pages site and no Android/Windows wrapper: QA runs `bash -n` on every `.sh` file plus the commands in
+`"setup"` and `"test"`, and the downloads come from `"extras"` (a script that zips the app, once per channel). The
+beta is a pre-release, and promotion makes the production zip the Latest release.
+
+```json
+{
+  "id": "dronedash", "name": "Drone Dash", "type": "server",
+  "setup": ["pip install -r requirements.txt"], "test": ["python3 tests/smoke_test.py"],
+  "version": [{ "file": "server.py", "pattern": "APP_VERSION = \"([^\"]*)\"" }],
+  "extras": { "enabled": true, "custom": "bash scripts/package.sh" }
+}
+```
+
 ## Service worker rules
 
 ```js

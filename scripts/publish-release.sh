@@ -14,7 +14,7 @@ if [ "$MODE" = beta ]; then
   {
     echo "**Beta for testing.** Your real app and its data aren't touched: the beta keeps its own storage and installs as a separate app."
     echo
-    echo "- **Web:** ${URL%/}/beta/"
+    [ -n "${URL:-}" ] && echo "- **Web:** ${URL%/}/beta/"
     for f in "${beta_files[@]}"; do echo "- **$(basename "$f")**"; done
     echo
     echo "## What's new"
@@ -29,7 +29,7 @@ if [ "$MODE" = beta ]; then
     gh release delete "$TAG" --repo "$REPO" --yes
   fi
   {
-    echo "- **Web:** ${URL%/}/"
+    [ -n "${URL:-}" ] && echo "- **Web:** ${URL%/}/"
     for f in "${prod_files[@]}"; do echo "- **$(basename "$f")**"; done
     echo
     echo "## What's new"
@@ -48,5 +48,5 @@ elif [ "$MODE" = promote ]; then
     echo "::warning::No draft release was waiting for $TAG, so this release has the web app only."
     gh release create "$TAG" --repo "$REPO" --verify-tag --latest --title "$NAME $VERSION" --notes-file /tmp/changes.md
   fi
-  echo "Production $TAG is live at ${URL%/}/" >> "$GITHUB_STEP_SUMMARY"
+  echo "Production $TAG is published${URL:+ and live at ${URL%/}/}" >> "$GITHUB_STEP_SUMMARY"
 fi

@@ -35,6 +35,7 @@ jobs:
       beta_full: ${{ steps.info.outputs.beta_full }}
       name: ${{ steps.info.outputs.name }}
       app_sub: ${{ steps.info.outputs.app_sub }}
+      type: ${{ steps.info.outputs.type }}
       android: ${{ steps.info.outputs.android }}
       windows: ${{ steps.info.outputs.windows }}
       ios: ${{ steps.info.outputs.ios }}
@@ -69,7 +70,7 @@ jobs:
   web:
     name: Build the web app
     needs: [prepare, qa]
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ !failure() && !cancelled() && needs.prepare.outputs.type == 'web' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -201,14 +202,16 @@ jobs:
 
   extras:
     name: Extra downloads
-    needs: [prepare, web]
+    needs: [prepare, qa, web]
     if: ${{ !failure() && !cancelled() && needs.prepare.outputs.mode == 'beta' && needs.prepare.outputs.extras == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/checkout@v4
         with: { repository: krazow/release-kit, ref: '${{ inputs.kit_ref }}', path: .kit }
       - uses: actions/download-artifact@v4
+        if: needs.prepare.outputs.type == 'web'
         with: { name: www, path: /tmp/www }
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
@@ -223,7 +226,7 @@ jobs:
   deploy:
     name: Publish the web app
     needs: [prepare, web, android, windows, ios, macos, extras]
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ !failure() && !cancelled() && needs.prepare.outputs.type == 'web' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -239,7 +242,7 @@ jobs:
 
   release:
     name: GitHub release
-    needs: [prepare, deploy]
+    needs: [prepare, qa, android, windows, ios, macos, extras, deploy]
     if: ${{ !failure() && !cancelled() && needs.prepare.outputs.mode != 'rollback' }}
     runs-on: ubuntu-latest
     steps:
@@ -262,7 +265,7 @@ jobs:
   live-check:
     name: Smoke-test the live site
     needs: [prepare, deploy, release]
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ !failure() && !cancelled() && needs.prepare.outputs.type == 'web' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
