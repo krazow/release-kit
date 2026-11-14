@@ -41,8 +41,7 @@ const CHECKS = [
   }],
   ['it still opens offline', async () => {
     await page.context().setOffline(true);
-    await page.reload({ waitUntil: 'load' });
-    await page.context().setOffline(false);
+    try { await page.reload({ waitUntil: 'load' }); } finally { await page.context().setOffline(false); }
   }],
   // Add this app's own important actions here, for example:
   // ['adding an item works', async () => { await page.click('text=Add'); await page.fill('#name', 'Test'); await page.click('text=Save'); await page.waitForSelector('text=Test'); }],
