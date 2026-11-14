@@ -39,7 +39,7 @@ worker must only delete caches starting with its own `CACHE_PREFIX`. The QA chec
 | Platform | Production | Beta |
 |---|---|---|
 | Web (any device) | `https://krazow.github.io/<repo>/` | `…/<repo>/beta/` |
-| Android | `<App>-X.Y.Z.apk` (app ID from `release.json`) | `<App>-Beta-….apk`: separate app (`.beta` app ID), installs beside the real one |
+| Android (optional, off unless `release.json` turns it on) | `<App>-X.Y.Z.apk` (app ID from `release.json`) | `<App>-Beta-….apk`: separate app (`.beta` app ID), installs beside the real one |
 | Windows | `<App>-Setup-X.Y.Z.exe`: per-user, no admin, Edge app window | `<App>-Beta-Setup-….exe`: own folder, port (+1000) and data |
 | iOS | Web app (Safari → Add to Home Screen), or an app's own unsigned `.ipa` build | the `/beta/` address |
 | macOS | Web app (Safari → Add to Dock, or Chrome → Install) | the `/beta/` address |
