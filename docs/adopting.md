@@ -43,6 +43,8 @@ Remove any workflow that deploys Pages or makes releases on push to `main`: rele
 - **prebuild**: commands run in the repo before the site is copied (generated files, for example).
 - **version**: every place the app shows its version. The first `( )` group in `pattern` is replaced with the release's version.
 - **android.appId**: never change it after release, or phones treat it as a different app. The beta uses `<appId>.beta`.
+  Add `"requireKey": true` for an app whose APKs are already signed with a real key: without the signing secrets the
+  pipeline then skips the APK instead of signing it with a throwaway key that couldn't update existing installs.
 - **windows.port**: fixed and different for every app (40000–49000). The app's saved data on Windows is tied to it.
   The beta uses port + 1000.
 - **Custom builds**: any platform can use `"build": "custom", "custom": "bash scripts/build-x.sh"`. The command runs

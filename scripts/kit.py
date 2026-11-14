@@ -75,8 +75,10 @@ def cmd_info(_args):
     cfg = load_cfg()
     ref = os.environ.get("GITHUB_REF_NAME", "")
     rollback = os.environ.get("ROLLBACK_TO", "").strip()
-    prod_tags = tags_matching(TAG_PROD)
-    beta_tags = tags_matching(TAG_BETA)
+    # Only tags made with the kit count (older releases have no release.json to build from).
+    kit_made = lambda t: subprocess.run(["git", "cat-file", "-e", f"{t}:release.json"], capture_output=True).returncode == 0
+    prod_tags = [t for t in tags_matching(TAG_PROD) if kit_made(t)]
+    beta_tags = [t for t in tags_matching(TAG_BETA) if kit_made(t)]
     if rollback:
         if not TAG_PROD.match(rollback) or rollback not in prod_tags:
             die(f"Rollback target {rollback!r} isn't a production tag. Production tags: {', '.join(prod_tags) or 'none yet'}.")

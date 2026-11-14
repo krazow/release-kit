@@ -15,6 +15,11 @@ IFS=. read -r MA MI PA <<< "$VERSION"
 CODE=$((MA * 10000 + MI * 100 + PA))
 BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
 
+REQUIRE=$(cfg ".get('android',{}).get('requireKey',False)")
+if [ -z "${KS_B64:-}" ] && [ "$REQUIRE" = True ]; then
+  echo "::warning::No Android signing key is set up, and this app's APKs must keep their existing key (requireKey), so no APK is built this time. Add the ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS secrets."
+  mkdir -p dist; exit 0
+fi
 if [ -n "${KS_B64:-}" ]; then
   echo "$KS_B64" | base64 -d > /tmp/ks
 else
