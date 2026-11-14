@@ -227,9 +227,11 @@ def cmd_build_web(args):
     exclude = set(DEFAULT_EXCLUDE) | set(cfg["exclude"])
     if out.exists():
         shutil.rmtree(out)
+    out_abs = out.resolve()
     def ignore(d, names):
         rel = Path(d).resolve().relative_to(site.resolve())
-        return [n for n in names if (str(rel / n) if str(rel) != "." else n) in exclude or n in (".git", "node_modules")]
+        return [n for n in names if (str(rel / n) if str(rel) != "." else n) in exclude or n in (".git", "node_modules")
+                or (Path(d) / n).resolve() == out_abs]
     shutil.copytree(site, out, ignore=ignore)
     app_rel = Path(cfg["app"]).resolve().relative_to(site.resolve()) if (src / cfg["app"]).resolve() != site.resolve() else Path(".")
     app_out = out / app_rel

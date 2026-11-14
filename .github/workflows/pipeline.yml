@@ -93,26 +93,26 @@ jobs:
           }
           case "$MODE" in
             beta)
-              if [ -n "$ROOT_TAG" ]; then build prod "$ROOT_TAG" site; else
-                echo "::notice::No production release yet, so this first release also goes to the main address."; build prod here site; fi
-              build beta here site/beta "$BETA_FULL"
-              build prod here www-prod; build beta here www-beta "$BETA_FULL" ;;
+              if [ -n "$ROOT_TAG" ]; then build prod "$ROOT_TAG" /tmp/site; else
+                echo "::notice::No production release yet, so this first release also goes to the main address."; build prod here /tmp/site; fi
+              build beta here /tmp/site/beta "$BETA_FULL"
+              build prod here /tmp/www-prod; build beta here /tmp/www-beta "$BETA_FULL" ;;
             promote)
-              build prod here site
-              build beta "$BETA_TAG" site/beta "$BETA_FULL" ;;
+              build prod here /tmp/site
+              build beta "$BETA_TAG" /tmp/site/beta "$BETA_FULL" ;;
             rollback)
-              build prod "$ROOT_TAG" site
-              if [ -n "$BETA_TAG" ]; then build beta "$BETA_TAG" site/beta "$BETA_FULL"; fi ;;
+              build prod "$ROOT_TAG" /tmp/site
+              if [ -n "$BETA_TAG" ]; then build beta "$BETA_TAG" /tmp/site/beta "$BETA_FULL"; fi ;;
           esac
       - uses: actions/upload-pages-artifact@v3
-        with: { path: site }
+        with: { path: /tmp/site }
       - name: Keep the app files for the native builds
         if: needs.prepare.outputs.mode == 'beta'
         env: { APP_SUB: '${{ needs.prepare.outputs.app_sub }}' }
-        run: mkdir -p www && cp -r "www-prod/$APP_SUB" www/prod && cp -r "www-beta/$APP_SUB" www/beta
+        run: mkdir -p /tmp/www && cp -r "/tmp/www-prod/$APP_SUB" /tmp/www/prod && cp -r "/tmp/www-beta/$APP_SUB" /tmp/www/beta
       - uses: actions/upload-artifact@v4
         if: needs.prepare.outputs.mode == 'beta'
-        with: { name: www, path: www, retention-days: 7 }
+        with: { name: www, path: /tmp/www, retention-days: 7 }
 
   android:
     name: Android APK
