@@ -7,13 +7,17 @@ In any app repo, type **`/releasenow`** in a Claude chat:
 
 | You type | What happens |
 |---|---|
-| `/releasenow` | Bumps the version, writes the changelog, pushes `vX.Y.Z-beta.N`. GitHub runs QA, builds every platform, publishes the beta and smoke-tests it live. |
+| `/releasenow` | Bumps the version, writes the changelog, pushes the `release/beta` branch. GitHub tags `vX.Y.Z-beta.N`, runs QA, builds every platform, publishes the beta and smoke-tests it live. |
 | `/releasenow promote` | Puts that beta into production: the main web address and the Latest release (with the APK and installer). |
 | `/releasenow all` | Beta, live smoke test, then production in one go (hotfixes). |
 | `/releasenow status` | What's on beta and production, and the last runs. |
 | `/releasenow rollback` | Puts the previous production version back at the main web address. |
 
 ## How a release works
+
+Releases start from a **branch push** (`release/beta`, `release/production`, `release/rollback/vX.Y.Z`), because
+Claude's cloud sessions can push branches but not tags. The pipeline creates the version tags itself. Pushing the
+tags directly (`v1.2.3-beta.1`, `v1.2.3`) from your own computer works too.
 
 1. **QA** (`qa.yml`): release checks (`VERSION`, service worker, manifest), both site variants build, the app's own
    tests (`npm test`, Playwright), and the kit's browser check. Apps also run this on every pull request (`ci.yml`).
@@ -24,7 +28,7 @@ In any app repo, type **`/releasenow`** in a Claude chat:
 3. **Beta**: GitHub Pages gets the last production version at the root and this beta at `/beta/`. A pre-release
    carries the beta downloads; a draft release `vX.Y.Z` holds the production downloads.
 4. **Live check**: a browser opens the real beta address.
-5. **Promote** (`vX.Y.Z` tag on a commit that passed beta): Pages root gets this version and the draft becomes Latest.
+5. **Promote** (`release/production` pushed to a commit that passed beta; the pipeline tags it `vX.Y.Z`): Pages root gets this version and the draft becomes Latest.
    The same files the testers had, not a rebuild.
 
 All krazow apps share the address `krazow.github.io`, so they share browser storage and caches. Each app's service
@@ -58,5 +62,6 @@ See [docs/adopting.md](docs/adopting.md) for adding an app.
 
 ## Changing the kit
 
-Apps use the `v1` tag. After a change passes the self-test (`self-test.yml`, which builds `examples/sample` on every
-platform), move the tag: `git tag -f v1 && git push -f origin v1`. Breaking changes get a `v2` tag, and apps move over one at a time.
+Apps use the kit's `v1` **branch** (`@v1`). Work on `main`; after a change passes the self-test (`self-test.yml`,
+which builds `examples/sample` on every platform), bring it to the apps with `git push origin main:v1`.
+Breaking changes go to a new `v2` branch, and apps move over one at a time.

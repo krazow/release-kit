@@ -75,6 +75,34 @@ def cmd_info(_args):
     cfg = load_cfg()
     ref = os.environ.get("GITHUB_REF_NAME", "")
     rollback = os.environ.get("ROLLBACK_TO", "").strip()
+    create_tag = ""
+    # Release requests can come as branch pushes (Claude's cloud sessions can push branches but not tags):
+    #   release/beta -> next beta of VERSION, release/production -> promote the beta at this commit,
+    #   release/rollback/vX.Y.Z -> put vX.Y.Z back. The pipeline then makes the tag itself.
+    all_tags = git("tag", "--list", "v*").split()
+    if ref.startswith("release/rollback/"):
+        rollback = ref.split("/", 2)[2]
+    elif ref == "release/beta":
+        v = Path("VERSION").read_text().strip() if Path("VERSION").exists() else ""
+        if not re.fullmatch(r"\d+\.\d+\.\d+", v):
+            die("VERSION must hold a version like 1.2.3.")
+        if f"v{v}" in all_tags:
+            die(f"v{v} is already released. Bump VERSION (run /releasenow again) for a new beta.")
+        nums = [int(TAG_BETA.match(x).group(2)) for x in all_tags if TAG_BETA.match(x) and TAG_BETA.match(x).group(1) == v]
+        ref = create_tag = f"v{v}-beta.{max(nums, default=0) + 1}"
+    elif ref == "release/production":
+        head = git("rev-parse", "HEAD")
+        here = [x for x in all_tags if TAG_BETA.match(x) and git("rev-list", "-n1", x) == head]
+        if not here:
+            die("release/production must point at a commit that went through beta. Run /releasenow first, then /releasenow promote.")
+        here.sort(key=lambda x: [int(n) for n in TAG_BETA.match(x).group(1).split(".")] + [int(TAG_BETA.match(x).group(2))])
+        v = TAG_BETA.match(here[-1]).group(1)
+        if f"v{v}" in all_tags:
+            die(f"v{v} is already in production.")
+        ref = create_tag = f"v{v}"
+    if create_tag:
+        subprocess.run(["git", "-c", "user.name=github-actions[bot]", "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com",
+                        "tag", "-a", create_tag, "-m", f"Release {create_tag}"], check=True)
     # Only tags made with the kit count (older releases have no release.json to build from).
     kit_made = lambda t: subprocess.run(["git", "cat-file", "-e", f"{t}:release.json"], capture_output=True).returncode == 0
     prod_tags = [t for t in tags_matching(TAG_PROD) if kit_made(t)]
@@ -102,7 +130,7 @@ def cmd_info(_args):
     if mode in ("beta", "promote") and file_version != version:
         die(f"The VERSION file says {file_version or 'nothing'} but the tag is for {version}. /releasenow keeps these in step.")
     app_sub = os.path.relpath(cfg["app"], cfg["site"])
-    gh_out(mode=mode, version=version, app_sub=app_sub, root_tag=root_tag, beta_tag=beta_tag,
+    gh_out(mode=mode, version=version, app_sub=app_sub, create_tag=create_tag, root_tag=root_tag, beta_tag=beta_tag,
            beta_full=(TAG_BETA.match(beta_tag).group(0)[1:] if beta_tag else ""),
            id=cfg["id"], name=cfg["name"],
            android=str(cfg["android"]["enabled"]).lower(), windows=str(cfg["windows"]["enabled"]).lower(),

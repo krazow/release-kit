@@ -1,8 +1,9 @@
 # Krazow release kit: the one release pipeline every app uses.
 # An app calls it from .github/workflows/release.yml (see templates/release.yml). Tags decide what happens:
-#   v1.2.3-beta.1  -> QA, build every platform, publish the beta (web /beta/, pre-release), smoke-test it live
-#   v1.2.3         -> promote: the same version goes to the main web address and its release becomes Latest
-#   rollback_to    -> (run by hand) put an earlier production version back at the main web address
+#   push to release/beta (or tag v1.2.3-beta.N) -> QA, build every platform, publish the beta (web /beta/,
+#                     pre-release), smoke-test it live. From the branch, the pipeline makes the next beta tag itself.
+#   push to release/production (or tag v1.2.3) -> promote the beta at that commit: the main web address and Latest release
+#   push to release/rollback/v1.2.3 (or run with rollback_to) -> put an earlier production version back on the web
 name: Release pipeline
 
 on:
@@ -47,6 +48,9 @@ jobs:
       - id: info
         env: { ROLLBACK_TO: '${{ inputs.rollback_to }}' }
         run: python3 .kit/scripts/kit.py info
+      - name: Push the release tag
+        if: steps.info.outputs.create_tag != ''
+        run: git push origin "refs/tags/${{ steps.info.outputs.create_tag }}"
       - name: Summary
         run: |
           {
