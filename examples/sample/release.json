@@ -6,7 +6,7 @@
   "app": ".",
   "sw": "sw.js",
   "version": [{ "file": "index.html", "pattern": "const APP_VERSION = '([^']*)'" }],
-  "android": { "enabled": true, "appId": "com.krazow.kitsample" },
+  "android": { "enabled": true, "appId": "com.krazow.kitsample", "camera": true },
   "windows": { "enabled": true, "port": 47990 },
   "ios": { "enabled": false },
   "macos": { "enabled": false },

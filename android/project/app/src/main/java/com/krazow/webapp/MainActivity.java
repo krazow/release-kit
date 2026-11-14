@@ -41,7 +41,7 @@ import java.util.Collections;
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private static final String HOME = "https://" + HOST + "/www/index.html";
-    private static final int REQ_FILE = 1, REQ_SAVE = 2, REQ_LOCATION = 3;
+    private static final int REQ_FILE = 1, REQ_SAVE = 2, REQ_LOCATION = 3, REQ_CAMERA = 4;
 
     // Turns <a download href="blob:..."> clicks into a call to the Android bridge.
     private static final String DOWNLOAD_SHIM =
@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> fileCallback;
     private GeolocationPermissions.Callback geoCallback;
     private String geoOrigin;
+    private PermissionRequest camRequest;
     private String saveId;
     private byte[] saveBytes;
 
@@ -138,7 +139,18 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                request.deny(); // no live camera or microphone; photos come through the file picker
+                // Live camera (for example QR scanning) only when the app was built with "camera": true; never the microphone.
+                boolean wantsVideo = false, other = false;
+                for (String r : request.getResources()) {
+                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r)) wantsVideo = true; else other = true;
+                }
+                if (!wantsVideo || other || !declaresCamera()) { request.deny(); return; }
+                if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[] { PermissionRequest.RESOURCE_VIDEO_CAPTURE });
+                } else {
+                    camRequest = request;
+                    requestPermissions(new String[] { Manifest.permission.CAMERA }, REQ_CAMERA);
+                }
             }
         });
         web.addJavascriptInterface(new Bridge(), "KrazowAndroid");
@@ -174,8 +186,22 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean declaresCamera() {
+        try {
+            String[] req = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_PERMISSIONS).requestedPermissions;
+            if (req != null) for (String p : req) if (Manifest.permission.CAMERA.equals(p)) return true;
+        } catch (Exception ignored) { }
+        return false;
+    }
+
     @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
+        if (code == REQ_CAMERA && camRequest != null) {
+            if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) camRequest.grant(new String[] { PermissionRequest.RESOURCE_VIDEO_CAPTURE });
+            else camRequest.deny();
+            camRequest = null;
+            return;
+        }
         if (code == REQ_LOCATION && geoCallback != null) {
             geoCallback.invoke(geoOrigin, hasLocation(), true);
             geoCallback = null;

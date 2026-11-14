@@ -50,6 +50,7 @@ jobs:
           "$BT/aapt2" dump badging dist/beta/*.apk | grep -E "^package|application-label:"
           "$BT/aapt2" dump badging dist/beta/*.apk | grep -q "name='com.krazow.kitsample.beta'"
           unzip -l dist/prod/*.apk | grep -q "assets/www/index.html"
+          "$BT/aapt2" dump badging dist/prod/*.apk | grep -q "android.permission.CAMERA"
 
   windows:
     needs: web

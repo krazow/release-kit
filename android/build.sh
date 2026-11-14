@@ -33,6 +33,9 @@ for CH in prod beta; do
   rm -rf "$W" && cp -r "$KIT/android/project" "$W"
   mkdir -p "$W/app/src/main/assets/www" && cp -r /tmp/www/$CH/. "$W/app/src/main/assets/www/"
   python3 "$KIT/scripts/kit.py" icons "/tmp/www/$CH" --android-res "$W/app/src/main/res"
+  if [ "$(cfg ".get('android',{}).get('camera',False)")" = True ]; then
+    sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#&\n    <uses-permission android:name="android.permission.CAMERA" />#' "$W/app/src/main/AndroidManifest.xml"
+  fi
   if [ $CH = beta ]; then ID="$APPID.beta"; AN="$NAME Beta"; VN="$BETA_FULL"; OUTF="$FILE-Beta-$BETA_FULL.apk"
   else ID="$APPID"; AN="$NAME"; VN="$VERSION"; OUTF="$FILE-$VERSION.apk"; fi
   (cd "$W" && gradle --no-daemon --console=plain assembleRelease -PappId="$ID" -PappName="$AN" -PversionName="$VN" -PversionCode="$CODE")
